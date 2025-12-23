@@ -38,6 +38,9 @@ const globeConfig = {
 // Backend API URL
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+// Mode type
+type ViewMode = "live" | "historical";
+
 // Map severity (1-5) to colors
 const getSeverityColor = (severity: number): string => {
   const colors = {
@@ -80,8 +83,12 @@ interface Arc {
 }
 
 export default function Home() {
+  const [mode, setMode] = useState<ViewMode>("live");
   const [arcs, setArcs] = useState<Arc[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [isLoadingHistorical, setIsLoadingHistorical] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const orderCounter = useRef(1);
   const arcsRef = useRef<Arc[]>([]);
@@ -91,7 +98,77 @@ export default function Home() {
     arcsRef.current = arcs;
   }, [arcs]);
 
+  // Fetch available dates on mount
   useEffect(() => {
+    const fetchDates = async () => {
+      try {
+        const response = await fetch(`${API_URL}/history/dates`);
+        if (response.ok) {
+          const dates = await response.json();
+          setAvailableDates(dates);
+          if (dates.length > 0) {
+            setSelectedDate(dates[0]); // Default to most recent date
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching available dates:", error);
+      }
+    };
+    fetchDates();
+  }, []);
+
+  // Load historical data when date changes
+  useEffect(() => {
+    if (mode === "historical" && selectedDate) {
+      loadHistoricalData(selectedDate);
+    }
+  }, [mode, selectedDate]);
+
+  const loadHistoricalData = async (date: string) => {
+    setIsLoadingHistorical(true);
+    try {
+      const response = await fetch(`${API_URL}/history/events?date=${date}`);
+      if (response.ok) {
+        const events = await response.json();
+        
+        // Transform historical events to arcs
+        const historicalArcs = events.map((event: any, index: number) => ({
+          order: index + 1,
+          startLat: event.source.lat,
+          startLng: event.source.lng,
+          endLat: event.target.lat,
+          endLng: event.target.lng,
+          arcAlt: calculateArcAlt(
+            event.source.lat,
+            event.source.lng,
+            event.target.lat,
+            event.target.lng
+          ),
+          color: getSeverityColor(event.severity),
+          timestamp: event.timestamp,
+        }));
+        
+        setArcs(historicalArcs);
+      }
+    } catch (error) {
+      console.error("Error loading historical data:", error);
+    } finally {
+      setIsLoadingHistorical(false);
+    }
+  };
+
+  // Live mode SSE connection
+  useEffect(() => {
+    if (mode !== "live") {
+      // Cleanup SSE if switching away from live mode
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+        setConnectionStatus("disconnected");
+      }
+      return;
+    }
+
     // Connect to SSE endpoint
     const eventSource = new EventSource(`${API_URL}/events/stream`);
     eventSourceRef.current = eventSource;
@@ -137,7 +214,7 @@ export default function Home() {
       setConnectionStatus("disconnected");
     };
 
-    // Cleanup old events every 5 seconds
+    // Cleanup old events every 5 seconds in live mode
     const cleanupInterval = setInterval(() => {
       const now = Date.now();
       setArcs((prevArcs) => {
@@ -153,32 +230,93 @@ export default function Home() {
       eventSource.close();
       clearInterval(cleanupInterval);
     };
-  }, []);
+  }, [mode]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-black py-20 w-full">
       <div className="max-w-7xl mx-auto w-full relative overflow-hidden h-full md:h-[40rem] px-4">
-        <div className="flex flex-col items-center justify-center">
+        <div className="flex flex-col items-center justify-center relative z-50">
           <h2 className="text-center text-xl md:text-4xl font-bold text-white">
-            DDoS Attack Live Map
+            DDoS Attack {mode === "live" ? "Live" : "Historical"} Map
           </h2>
           <p className="text-center text-base md:text-lg font-normal text-neutral-200 max-w-md mt-2 mb-4">
-            Real-time visualization of DDoS attacks happening around the world.
+            {mode === "live" 
+              ? "Real-time visualization of DDoS attacks happening around the world."
+              : "Explore historical malicious activity from past dates."}
           </p>
+          
+          {/* Mode Switcher */}
           <div className="flex items-center gap-2 mb-4">
-            <div className={`w-2 h-2 rounded-full ${
-              connectionStatus === "connected" ? "bg-green-500" : 
-              connectionStatus === "connecting" ? "bg-yellow-500 animate-pulse" : 
-              "bg-red-500"
-            }`} />
+            <button
+              onClick={() => setMode("live")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors cursor-pointer ${
+                mode === "live"
+                  ? "bg-cyan-500 text-white"
+                  : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
+              }`}
+            >
+              Live Mode
+            </button>
+            <button
+              onClick={() => setMode("historical")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors cursor-pointer ${
+                mode === "historical"
+                  ? "bg-purple-500 text-white"
+                  : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
+              }`}
+            >
+              Historical Mode
+            </button>
+          </div>
+
+          {/* Date Picker for Historical Mode */}
+          {mode === "historical" && (
+            <div className="mb-4">
+              <select
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="px-4 py-2 bg-neutral-800 text-white rounded-lg border border-neutral-700 focus:outline-none focus:border-purple-500 cursor-pointer"
+              >
+                {availableDates.map((date) => (
+                  <option key={date} value={date}>
+                    {date}
+                  </option>
+                ))}
+              </select>
+              {isLoadingHistorical && (
+                <span className="ml-3 text-sm text-neutral-400">Loading...</span>
+              )}
+            </div>
+          )}
+
+          {/* Status Indicator */}
+          <div className="flex items-center gap-2 mb-4">
+            {mode === "live" && (
+              <>
+                <div className={`w-2 h-2 rounded-full ${
+                  connectionStatus === "connected" ? "bg-green-500" : 
+                  connectionStatus === "connecting" ? "bg-yellow-500 animate-pulse" : 
+                  "bg-red-500"
+                }`} />
+                <span className="text-sm text-neutral-400">
+                  {connectionStatus === "connected" ? "Live" : 
+                   connectionStatus === "connecting" ? "Connecting..." : 
+                   "Disconnected"}
+                </span>
+                <span className="text-sm text-neutral-500">|</span>
+              </>
+            )}
+            {mode === "historical" && (
+              <>
+                <div className="w-2 h-2 rounded-full bg-purple-500" />
+                <span className="text-sm text-neutral-400">
+                  Viewing {selectedDate}
+                </span>
+                <span className="text-sm text-neutral-500">|</span>
+              </>
+            )}
             <span className="text-sm text-neutral-400">
-              {connectionStatus === "connected" ? "Live" : 
-               connectionStatus === "connecting" ? "Connecting..." : 
-               "Disconnected"}
-            </span>
-            <span className="text-sm text-neutral-500">|</span>
-            <span className="text-sm text-neutral-400">
-              {arcs.length} active {arcs.length === 1 ? "attack" : "attacks"}
+              {arcs.length} {mode === "live" ? "active" : "total"} {arcs.length === 1 ? "attack" : "attacks"}
             </span>
           </div>
         </div>

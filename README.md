@@ -1,6 +1,6 @@
 # DDoS Live Map
 
-A real-time visualization of global DDoS attacks displayed on an interactive 3D globe. This project demonstrates the flow of cyber attacks between countries using Server-Sent Events (SSE) for live data streaming.
+A real-time and historical visualization of global DDoS attacks displayed on an interactive 3D globe. This project demonstrates both live simulated attacks and historical threat intelligence from AbuseIPDB using Server-Sent Events (SSE) for real-time data streaming.
 
 ![DDoS Live Map](https://img.shields.io/badge/status-active-success.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
@@ -9,12 +9,35 @@ A real-time visualization of global DDoS attacks displayed on an interactive 3D 
 
 ## Features
 
+### Phase 1 - Live Simulation ✅
 - 🌍 **Interactive 3D Globe** - Powered by Three.js and react-three-fiber
 - ⚡ **Real-time Updates** - Server-Sent Events (SSE) for live attack streaming
 - 🎨 **Beautiful Animations** - Smooth arcs showing attack paths between countries
 - 🎯 **Attack Types** - Visualizes DDoS, bot, and brute-force attacks
 - 📊 **Severity Levels** - Color-coded attack severity (1-5 scale)
 - 🔄 **Auto-Rotate** - Globe automatically rotates for better visibility
+
+### Phase 2 - Historical Intelligence ✅
+- 📅 **Date Selection** - Explore malicious activity from specific dates
+- 🔍 **AbuseIPDB Integration** - Real threat intelligence from reported abuse data
+- 📈 **Historical Replay** - Visualize past attack patterns
+- 🔀 **Mode Switching** - Toggle between live simulation and historical data
+- 📊 **Aggregated Stats** - Country and attack type breakdowns
+- 🎯 **Privacy-First** - No raw IP addresses exposed in UI
+
+## What This Is
+
+- **Phase 1**: A visual simulation demonstrating what a live DDoS attack map could look like
+- **Phase 2**: A historical threat intelligence explorer showing past reported malicious activity
+- **Purpose**: Research, analysis, and understanding global cyber threat patterns
+
+## What This Is NOT
+
+- ❌ Not real-time packet capture
+- ❌ Not an intrusion detection system  
+- ❌ Not monitoring actual live attacks
+- ❌ Not exposing individual IP addresses
+- ❌ Not claiming to show current threats (historical data only in Phase 2)
 
 ## Architecture
 
@@ -118,17 +141,19 @@ yarn dev
 
 ## API Endpoints
 
-### `GET /`
-Health check endpoint
-- **Response**: `{"status": "ok"}`
+### Live Mode (Phase 1)
 
-### `GET /events/stream`
+#### `GET /`
+Health check endpoint
+- **Response**: `{"status": "ok", "mode": "live + historical"}`
+
+#### `GET /events/stream`
 Server-Sent Events stream for attack events
 - **Content-Type**: `text/event-stream`
 - **Event Type**: `attack`
 - **Update Interval**: ~1.5 seconds
 
-#### Event Data Format:
+##### Event Data Format:
 ```json
 {
   "id": "uuid",
@@ -148,7 +173,74 @@ Server-Sent Events stream for attack events
 }
 ```
 
+### Historical Mode (Phase 2)
+
+#### `GET /history/dates`
+Get list of available dates with historical data
+- **Response**: Array of date strings in `YYYY-MM-DD` format
+
+#### `GET /history/summary?date=YYYY-MM-DD`
+Get aggregated summary for a specific date
+- **Parameters**: 
+  - `date`: Date string in YYYY-MM-DD format
+- **Response**:
+```json
+{
+  "date": "2024-12-22",
+  "total_events": 45,
+  "events_by_country": {"US": 15, "CN": 10, ...},
+  "events_by_type": {"ddos": 20, "bot": 15, ...},
+  "avg_severity": 3.2
+}
+```
+
+#### `GET /history/countries?date=YYYY-MM-DD`
+Get per-country statistics for a specific date
+- **Parameters**: 
+  - `date`: Date string in YYYY-MM-DD format
+- **Response**: Array of country statistics
+
+#### `GET /history/events?date=YYYY-MM-DD`
+Get all attack events for a specific date
+- **Parameters**: 
+  - `date`: Date string in YYYY-MM-DD format
+- **Response**: Array of attack events (same format as live events)
+
+#### `POST /history/fetch/{date}`
+Manually trigger data fetch for a specific date
+- **Parameters**: 
+  - `date`: Date string in YYYY-MM-DD format
+- **Response**: 
+```json
+{
+  "status": "success",
+  "date": "2024-12-22",
+  "events_fetched": 45
+}
+```
+
 ## Configuration
+
+### Backend Environment Variables
+
+Create a `.env` file in the `backend/` directory:
+
+```bash
+# AbuseIPDB API Configuration (optional for Phase 2)
+ABUSEIPDB_API_KEY=your_api_key_here
+
+# Server Configuration
+HOST=0.0.0.0
+PORT=8000
+```
+
+**Note**: If no AbuseIPDB API key is provided, Phase 2 will generate synthetic historical data for demonstration purposes.
+
+To get an AbuseIPDB API key:
+1. Sign up at [https://www.abuseipdb.com](https://www.abuseipdb.com)
+2. Navigate to your account settings
+3. Generate a new API key
+4. Add it to your `.env` file
 
 ### Globe Configuration (Frontend)
 Customize the globe appearance in [`frontend/src/app/page.tsx`](frontend/src/app/page.tsx):
@@ -166,7 +258,9 @@ const globeConfig = {
 ```
 
 ### Locations (Backend)
-Modify attack source/target locations in [`backend/app/services/event_generator.py`](backend/app/services/event_generator.py)
+Modify attack source/target locations in:
+- Live mode: [`backend/app/services/event_generator.py`](backend/app/services/event_generator.py)
+- Historical mode: [`backend/app/services/historical_data.py`](backend/app/services/historical_data.py)
 
 ## Tech Stack
 
