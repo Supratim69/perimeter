@@ -254,7 +254,7 @@ export default function Home() {
       {/* Info Button - Fixed Position */}
       <button
         onClick={() => setShowInfoModal(true)}
-        className="fixed top-6 left-6 z-[60] w-8 h-8 text-neutral-500 hover:text-white transition-colors cursor-pointer"
+        className="fixed top-4 left-4 sm:top-6 sm:left-6 z-[60] w-8 h-8 text-neutral-500 hover:text-white active:text-white transition-colors cursor-pointer"
         aria-label="Information"
       >
         <svg
@@ -275,13 +275,16 @@ export default function Home() {
 
       {/* Info Modal */}
       {showInfoModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black bg-opacity-75">
-          <div className="bg-neutral-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-neutral-700">
-            <div className="sticky top-0 bg-neutral-900 border-b border-neutral-700 p-6 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">About This Project</h2>
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm"
+          onClick={(e) => e.target === e.currentTarget && setShowInfoModal(false)}
+        >
+          <div className="bg-neutral-900 rounded-lg max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto border border-neutral-700">
+            <div className="sticky top-0 bg-neutral-900 border-b border-neutral-700 p-4 sm:p-6 flex items-center justify-between">
+              <h2 className="text-xl sm:text-2xl font-bold text-white">About This Project</h2>
               <button
                 onClick={() => setShowInfoModal(false)}
-                className="text-neutral-400 hover:text-white transition-colors"
+                className="text-neutral-400 hover:text-white active:text-white transition-colors p-1"
                 aria-label="Close"
               >
                 <svg
@@ -297,7 +300,7 @@ export default function Home() {
               </button>
             </div>
             
-            <div className="p-6 space-y-6">
+            <div className="p-4 sm:p-6 space-y-5 sm:space-y-6">
               {/* Overview */}
               <div>
                 <h3 className="text-lg font-bold text-white mb-2">🌍 Overview</h3>
@@ -403,49 +406,49 @@ export default function Home() {
       )}
 
       {/* Main Globe View */}
-      <div className="flex-1 flex flex-col items-center justify-center py-20 px-4">
-        <div className="max-w-7xl mx-auto w-full relative overflow-hidden h-full md:h-[40rem]">
-          <div className="flex flex-col items-center justify-center relative z-50">
-            <h2 className="text-center text-xl md:text-4xl font-bold text-white">
+      <div className="flex-1 flex flex-col items-center justify-start pt-12 sm:pt-16 md:pt-20 px-3 sm:px-4 min-h-[60vh] lg:min-h-screen">
+        <div className="max-w-7xl mx-auto w-full relative overflow-hidden h-[50vh] sm:h-[55vh] md:h-[40rem]">
+          <div className="flex flex-col items-center justify-center relative z-50 px-2">
+            <h2 className="text-center text-lg sm:text-xl md:text-4xl font-bold text-white">
               DDoS Attack {mode === "live" ? "Live" : "Historical"} Map
             </h2>
-            <p className="text-center text-base md:text-lg font-normal text-neutral-200 max-w-md mt-2 mb-4">
+            <p className="text-center text-sm sm:text-base md:text-lg font-normal text-neutral-200 max-w-md mt-1 sm:mt-2 mb-3 sm:mb-4 px-4">
               {mode === "live" 
                 ? "Real-time visualization of DDoS attacks happening around the world."
                 : "Explore historical malicious activity from past dates."}
             </p>
             
             {/* Mode Switcher */}
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2 mb-3 sm:mb-4">
               <button
                 onClick={() => setMode("live")}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors cursor-pointer ${
+                className={`px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base font-medium transition-colors cursor-pointer active:scale-95 ${
                   mode === "live"
                     ? "bg-cyan-500 text-white"
-                    : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
+                    : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700 active:bg-neutral-700"
                 }`}
               >
-                Live Mode
+                Live
               </button>
               <button
                 onClick={() => setMode("historical")}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors cursor-pointer ${
+                className={`px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base font-medium transition-colors cursor-pointer active:scale-95 ${
                   mode === "historical"
                     ? "bg-purple-500 text-white"
-                    : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
+                    : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700 active:bg-neutral-700"
                 }`}
               >
-                Historical Mode
+                Historical
               </button>
             </div>
 
             {/* Date Picker for Historical Mode */}
             {mode === "historical" && (
-              <div className="mb-4">
+              <div className="mb-3 sm:mb-4 flex items-center gap-2">
                 <select
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="px-4 py-2 bg-neutral-800 text-white rounded-lg border border-neutral-700 focus:outline-none focus:border-purple-500 cursor-pointer"
+                  className="px-3 sm:px-4 py-2 bg-neutral-800 text-white text-sm sm:text-base rounded-lg border border-neutral-700 focus:outline-none focus:border-purple-500 cursor-pointer min-w-[140px]"
                 >
                   {availableDates.map((date) => (
                     <option key={date} value={date}>
@@ -454,13 +457,13 @@ export default function Home() {
                   ))}
                 </select>
                 {isLoadingHistorical && (
-                  <span className="ml-3 text-sm text-neutral-400">Loading...</span>
+                  <span className="text-xs sm:text-sm text-neutral-400">Loading...</span>
                 )}
               </div>
             )}
 
             {/* Status Indicator */}
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2 mb-3 sm:mb-4 flex-wrap justify-center">
               {mode === "live" && (
                 <>
                   <div className={`w-2 h-2 rounded-full ${
@@ -468,69 +471,69 @@ export default function Home() {
                     connectionStatus === "connecting" ? "bg-yellow-500 animate-pulse" : 
                     "bg-red-500"
                   }`} />
-                  <span className="text-sm text-neutral-400">
+                  <span className="text-xs sm:text-sm text-neutral-400">
                     {connectionStatus === "connected" ? "Live" : 
                      connectionStatus === "connecting" ? "Connecting..." : 
                      "Disconnected"}
                   </span>
-                  <span className="text-sm text-neutral-500">|</span>
+                  <span className="text-xs sm:text-sm text-neutral-500 hidden sm:inline">|</span>
                 </>
               )}
               {mode === "historical" && (
                 <>
                   <div className="w-2 h-2 rounded-full bg-purple-500" />
-                  <span className="text-sm text-neutral-400">
-                    Viewing {selectedDate}
+                  <span className="text-xs sm:text-sm text-neutral-400">
+                    {selectedDate}
                   </span>
-                  <span className="text-sm text-neutral-500">|</span>
+                  <span className="text-xs sm:text-sm text-neutral-500 hidden sm:inline">|</span>
                 </>
               )}
-              <span className="text-sm text-neutral-400">
-                {arcs.length} {mode === "live" ? "active" : "total"} {arcs.length === 1 ? "attack" : "attacks"}
+              <span className="text-xs sm:text-sm text-neutral-400">
+                {arcs.length} {arcs.length === 1 ? "attack" : "attacks"}
               </span>
             </div>
           </div>
-          <div className="absolute w-full bottom-0 inset-x-0 h-40 bg-gradient-to-b pointer-events-none select-none from-transparent to-black z-40" />
-          <div className="absolute w-full -bottom-20 h-72 md:h-full z-10">
+          <div className="absolute w-full bottom-0 inset-x-0 h-24 sm:h-40 bg-gradient-to-b pointer-events-none select-none from-transparent to-black z-40" />
+          <div className="absolute w-full -bottom-10 sm:-bottom-20 h-[45vh] sm:h-72 md:h-full z-10">
             <World globeConfig={globeConfig} data={arcs} />
           </div>
         </div>
       </div>
 
       {/* Attack Info Panel */}
-      <div className="w-full lg:w-96 bg-neutral-900 border-l border-neutral-800 overflow-y-auto max-h-screen">
-        <div className="p-6">
-          <h3 className="text-xl font-bold text-white mb-4">
+      <div className="w-full lg:w-96 bg-neutral-900 border-t lg:border-t-0 lg:border-l border-neutral-800 overflow-y-auto max-h-[50vh] lg:max-h-screen">
+        <div className="p-4 sm:p-6">
+          <h3 className="text-lg sm:text-xl font-bold text-white mb-3 sm:mb-4">
             Recent Attacks
           </h3>
           
           {arcs.length === 0 ? (
-            <div className="text-neutral-400 text-sm text-center py-8">
+            <div className="text-neutral-400 text-sm text-center py-6 sm:py-8">
               No attacks to display
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="flex lg:flex-col gap-3 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 snap-x snap-mandatory lg:snap-none">
               {arcs.slice().reverse().slice(0, 20).map((arc, index) => (
                 <div
                   key={arc.order}
-                  className="bg-neutral-800 rounded-lg p-4 border border-neutral-700 hover:border-neutral-600 transition-colors"
+                  className="bg-neutral-800 rounded-lg p-3 sm:p-4 border border-neutral-700 hover:border-neutral-600 active:border-neutral-600 transition-colors min-w-[260px] sm:min-w-[280px] lg:min-w-0 flex-shrink-0 lg:flex-shrink snap-start"
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <div 
-                        className="w-3 h-3 rounded-full"
+                        className="w-2.5 sm:w-3 h-2.5 sm:h-3 rounded-full flex-shrink-0"
                         style={{ backgroundColor: arc.color }}
                       />
-                      <span className="text-white font-medium uppercase text-sm">
+                      <span className="text-white font-medium uppercase text-xs sm:text-sm">
                         {arc.attackType || "Unknown"}
                       </span>
                     </div>
-                    <span className="text-xs text-neutral-400">
+                    <span className="text-[10px] sm:text-xs text-neutral-400 flex-shrink-0">
                       {new Date(arc.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
                   
-                  <div className="space-y-2 text-sm">
+                  <div className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-neutral-400">Source:</span>
                       <span className="text-white font-mono">{arc.sourceCountry || "??"}</span>
@@ -541,11 +544,11 @@ export default function Home() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-neutral-400">Severity:</span>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-0.5 sm:gap-1">
                         {[1, 2, 3, 4, 5].map((level) => (
                           <div
                             key={level}
-                            className={`w-2 h-4 rounded-sm ${
+                            className={`w-1.5 sm:w-2 h-3 sm:h-4 rounded-sm ${
                               level <= (arc.severity || 1)
                                 ? level === 5 ? "bg-red-500" :
                                   level === 4 ? "bg-orange-500" :
@@ -556,7 +559,7 @@ export default function Home() {
                             }`}
                           />
                         ))}
-                        <span className="text-white ml-1">{arc.severity || 1}/5</span>
+                        <span className="text-white ml-1 text-xs sm:text-sm">{arc.severity || 1}/5</span>
                       </div>
                     </div>
                     {arc.confidence !== undefined && (
