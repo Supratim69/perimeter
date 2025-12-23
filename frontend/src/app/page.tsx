@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
 
 const World = dynamic(() => import("@/components/ui/globe").then((m) => m.World), {
@@ -10,6 +11,7 @@ const World = dynamic(() => import("@/components/ui/globe").then((m) => m.World)
   ),
 });
 
+// Move globeConfig outside component to prevent recreation
 const globeConfig = {
   pointSize: 4,
   globeColor: "#062056",
@@ -33,145 +35,126 @@ const globeConfig = {
   autoRotateSpeed: 0.5,
 };
 
-const sampleArcs = [
-  {
-    order: 1,
-    startLat: -19.885592,
-    startLng: -43.951191,
-    endLat: -22.9068,
-    endLng: -43.1729,
-    arcAlt: 0.1,
-    color: "#06b6d4",
-  },
-  {
-    order: 1,
-    startLat: 28.6139,
-    startLng: 77.209,
-    endLat: 3.139,
-    endLng: 101.6869,
-    arcAlt: 0.2,
-    color: "#3b82f6",
-  },
-  {
-    order: 1,
-    startLat: -19.885592,
-    startLng: -43.951191,
-    endLat: -1.303396,
-    endLng: 36.852443,
-    arcAlt: 0.5,
-    color: "#6366f1",
-  },
-  {
-    order: 2,
-    startLat: 1.3521,
-    startLng: 103.8198,
-    endLat: 35.6762,
-    endLng: 139.6503,
-    arcAlt: 0.2,
-    color: "#06b6d4",
-  },
-  {
-    order: 2,
-    startLat: 51.5072,
-    startLng: -0.1276,
-    endLat: 3.139,
-    endLng: 101.6869,
-    arcAlt: 0.3,
-    color: "#3b82f6",
-  },
-  {
-    order: 2,
-    startLat: -15.785493,
-    startLng: -47.909029,
-    endLat: 36.162809,
-    endLng: -115.119411,
-    arcAlt: 0.3,
-    color: "#6366f1",
-  },
-  {
-    order: 3,
-    startLat: -33.8688,
-    startLng: 151.2093,
-    endLat: 22.3193,
-    endLng: 114.1694,
-    arcAlt: 0.3,
-    color: "#06b6d4",
-  },
-  {
-    order: 3,
-    startLat: 21.3099,
-    startLng: -157.8581,
-    endLat: 40.7128,
-    endLng: -74.006,
-    arcAlt: 0.3,
-    color: "#3b82f6",
-  },
-  {
-    order: 3,
-    startLat: -6.2088,
-    startLng: 106.8456,
-    endLat: 51.5072,
-    endLng: -0.1276,
-    arcAlt: 0.3,
-    color: "#6366f1",
-  },
-  {
-    order: 4,
-    startLat: 11.986597,
-    startLng: 8.571831,
-    endLat: -15.595412,
-    endLng: -56.05918,
-    arcAlt: 0.5,
-    color: "#06b6d4",
-  },
-  {
-    order: 4,
-    startLat: -34.6037,
-    startLng: -58.3816,
-    endLat: 22.3193,
-    endLng: 114.1694,
-    arcAlt: 0.7,
-    color: "#3b82f6",
-  },
-  {
-    order: 4,
-    startLat: 51.5072,
-    startLng: -0.1276,
-    endLat: 48.8566,
-    endLng: -2.3522,
-    arcAlt: 0.1,
-    color: "#6366f1",
-  },
-  {
-    order: 5,
-    startLat: 14.5995,
-    startLng: 120.9842,
-    endLat: 51.5072,
-    endLng: -0.1276,
-    arcAlt: 0.3,
-    color: "#06b6d4",
-  },
-  {
-    order: 5,
-    startLat: 1.3521,
-    startLng: 103.8198,
-    endLat: -33.8688,
-    endLng: 151.2093,
-    arcAlt: 0.2,
-    color: "#3b82f6",
-  },
-  {
-    order: 5,
-    startLat: 34.0522,
-    startLng: -118.2437,
-    endLat: 48.8566,
-    endLng: -2.3522,
-    arcAlt: 0.2,
-    color: "#6366f1",
-  },
-];
+// Backend API URL
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+// Map severity (1-5) to colors
+const getSeverityColor = (severity: number): string => {
+  const colors = {
+    1: "#06b6d4", // cyan - low severity
+    2: "#3b82f6", // blue
+    3: "#8b5cf6", // purple
+    4: "#f97316", // orange
+    5: "#ef4444", // red - high severity
+  };
+  return colors[severity as keyof typeof colors] || "#06b6d4";
+};
+
+// Calculate arc altitude based on distance
+const calculateArcAlt = (startLat: number, startLng: number, endLat: number, endLng: number): number => {
+  const latDiff = Math.abs(startLat - endLat);
+  const lngDiff = Math.abs(startLng - endLng);
+  const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+  return Math.min(0.5, distance / 100);
+};
+
+interface AttackEvent {
+  id: string;
+  source: { country: string; lat: number; lng: number };
+  target: { country: string; lat: number; lng: number };
+  type: string;
+  severity: number;
+  confidence: number;
+  timestamp: number;
+}
+
+interface Arc {
+  order: number;
+  startLat: number;
+  startLng: number;
+  endLat: number;
+  endLng: number;
+  arcAlt: number;
+  color: string;
+  timestamp: number;
+}
 
 export default function Home() {
+  const [arcs, setArcs] = useState<Arc[]>([]);
+  const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const orderCounter = useRef(1);
+  const arcsRef = useRef<Arc[]>([]);
+
+  // Keep arcsRef in sync with state for use in interval
+  useEffect(() => {
+    arcsRef.current = arcs;
+  }, [arcs]);
+
+  useEffect(() => {
+    // Connect to SSE endpoint
+    const eventSource = new EventSource(`${API_URL}/events/stream`);
+    eventSourceRef.current = eventSource;
+
+    eventSource.onopen = () => {
+      console.log("SSE connection established");
+      setConnectionStatus("connected");
+    };
+
+    eventSource.addEventListener("attack", (event) => {
+      try {
+        const attackEvent: AttackEvent = JSON.parse(event.data);
+        
+        // Transform attack event to arc format
+        const newArc: Arc = {
+          order: orderCounter.current++,
+          startLat: attackEvent.source.lat,
+          startLng: attackEvent.source.lng,
+          endLat: attackEvent.target.lat,
+          endLng: attackEvent.target.lng,
+          arcAlt: calculateArcAlt(
+            attackEvent.source.lat,
+            attackEvent.source.lng,
+            attackEvent.target.lat,
+            attackEvent.target.lng
+          ),
+          color: getSeverityColor(attackEvent.severity),
+          timestamp: Date.now(),
+        };
+
+        setArcs((prevArcs) => {
+          // Add new arc and keep only the last 30 events
+          const updatedArcs = [...prevArcs, newArc];
+          return updatedArcs.slice(-30);
+        });
+      } catch (error) {
+        console.error("Error parsing attack event:", error);
+      }
+    });
+
+    eventSource.onerror = (error) => {
+      console.error("SSE error:", error);
+      setConnectionStatus("disconnected");
+    };
+
+    // Cleanup old events every 5 seconds
+    const cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      setArcs((prevArcs) => {
+        const filtered = prevArcs.filter((arc) => now - arc.timestamp < 30000);
+        // Only update if something was filtered out
+        if (filtered.length === prevArcs.length) return prevArcs;
+        return filtered;
+      });
+    }, 5000);
+
+    // Cleanup on unmount
+    return () => {
+      eventSource.close();
+      clearInterval(cleanupInterval);
+    };
+  }, []);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-black py-20 w-full">
       <div className="max-w-7xl mx-auto w-full relative overflow-hidden h-full md:h-[40rem] px-4">
@@ -182,10 +165,26 @@ export default function Home() {
           <p className="text-center text-base md:text-lg font-normal text-neutral-200 max-w-md mt-2 mb-4">
             Real-time visualization of DDoS attacks happening around the world.
           </p>
+          <div className="flex items-center gap-2 mb-4">
+            <div className={`w-2 h-2 rounded-full ${
+              connectionStatus === "connected" ? "bg-green-500" : 
+              connectionStatus === "connecting" ? "bg-yellow-500 animate-pulse" : 
+              "bg-red-500"
+            }`} />
+            <span className="text-sm text-neutral-400">
+              {connectionStatus === "connected" ? "Live" : 
+               connectionStatus === "connecting" ? "Connecting..." : 
+               "Disconnected"}
+            </span>
+            <span className="text-sm text-neutral-500">|</span>
+            <span className="text-sm text-neutral-400">
+              {arcs.length} active {arcs.length === 1 ? "attack" : "attacks"}
+            </span>
+          </div>
         </div>
         <div className="absolute w-full bottom-0 inset-x-0 h-40 bg-gradient-to-b pointer-events-none select-none from-transparent to-black z-40" />
         <div className="absolute w-full -bottom-20 h-72 md:h-full z-10">
-          <World globeConfig={globeConfig} data={sampleArcs} />
+          <World globeConfig={globeConfig} data={arcs} />
         </div>
       </div>
     </div>
