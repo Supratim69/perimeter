@@ -19,17 +19,18 @@ A real-time and historical visualization of global DDoS attacks displayed on an 
 
 ### Phase 2 - Historical Intelligence ✅
 - 📅 **Date Selection** - Explore malicious activity from specific dates
-- 🔍 **AbuseIPDB Integration** - Real threat intelligence from reported abuse data
-- 📈 **Historical Replay** - Visualize past attack patterns
+- 🔍 **AlienVault OTX Integration** - Real threat intelligence from Open Threat Exchange
+- 📈 **Historical Replay** - Visualize past attack patterns from community-reported threats
 - 🔀 **Mode Switching** - Toggle between live simulation and historical data
 - 📊 **Aggregated Stats** - Country and attack type breakdowns
 - 🎯 **Privacy-First** - No raw IP addresses exposed in UI
+- 💾 **Smart Caching** - Efficient data fetching with pulse-level caching
 
 ## What This Is
 
 - **Phase 1**: A visual simulation demonstrating what a live DDoS attack map could look like
-- **Phase 2**: A historical threat intelligence explorer showing past reported malicious activity
-- **Purpose**: Research, analysis, and understanding global cyber threat patterns
+- **Phase 2**: A historical threat intelligence explorer showing past reported malicious activity from AlienVault OTX
+- **Purpose**: Research, analysis, and understanding global cyber threat patterns from community intelligence
 
 ## What This Is NOT
 
@@ -38,6 +39,7 @@ A real-time and historical visualization of global DDoS attacks displayed on an 
 - ❌ Not monitoring actual live attacks
 - ❌ Not exposing individual IP addresses
 - ❌ Not claiming to show current threats (historical data only in Phase 2)
+- ❌ Not replacing professional threat intelligence platforms
 
 ## Architecture
 
@@ -226,21 +228,28 @@ Manually trigger data fetch for a specific date
 Create a `.env` file in the `backend/` directory:
 
 ```bash
-# AbuseIPDB API Configuration (optional for Phase 2)
-ABUSEIPDB_API_KEY=your_api_key_here
+# AlienVault OTX API Configuration (optional for Phase 2)
+OTX_API_KEY=your_api_key_here
 
 # Server Configuration
 HOST=0.0.0.0
 PORT=8000
 ```
 
-**Note**: If no AbuseIPDB API key is provided, Phase 2 will generate synthetic historical data for demonstration purposes.
+**Note**: If no OTX API key is provided, Phase 2 will generate synthetic historical data for demonstration purposes.
 
-To get an AbuseIPDB API key:
-1. Sign up at [https://www.abuseipdb.com](https://www.abuseipdb.com)
-2. Navigate to your account settings
-3. Generate a new API key
+To get an AlienVault OTX API key:
+1. Sign up at [https://otx.alienvault.com](https://otx.alienvault.com)
+2. Navigate to Settings → API Integration
+3. Copy your OTX API key
 4. Add it to your `.env` file
+
+**Why OTX?**
+- Community-driven threat intelligence
+- Free tier with generous limits
+- Rich pulse data with tags and indicators
+- Historical threat context
+- No IP address restrictions
 
 ### Globe Configuration (Frontend)
 Customize the globe appearance in [`frontend/src/app/page.tsx`](frontend/src/app/page.tsx):

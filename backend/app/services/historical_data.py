@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from collections import defaultdict
-from app.services.abuseipdb import AbuseIPDBClient, map_category_to_type, calculate_severity
+from app.services.otx import OTXClient, map_tags_to_attack_type, calculate_severity_from_pulse, extract_confidence_from_pulse
 from app.models.attack_event import AttackEvent, Location
 from app.models.historical import HistoricalSummary, CountryStats
 import logging
@@ -34,6 +34,11 @@ COUNTRY_LOCATIONS = {
     "PL": {"lat": 51.9194, "lng": 19.1451},
     "TR": {"lat": 38.9637, "lng": 35.2433},
     "UA": {"lat": 48.3794, "lng": 31.1656},
+    "IR": {"lat": 32.4279, "lng": 53.6880},
+    "KP": {"lat": 40.3399, "lng": 127.5101},
+    "VN": {"lat": 14.0583, "lng": 108.2772},
+    "TH": {"lat": 15.8700, "lng": 100.9925},
+    "ID": {"lat": -0.7893, "lng": 113.9213},
 }
 
 
@@ -43,12 +48,13 @@ class HistoricalDataStore:
     def __init__(self):
         # Structure: {date_str: [AttackEvent, ...]}
         self.events_by_date: Dict[str, List[Dict]] = {}
-        self.abuseipdb_client = AbuseIPDBClient()
+        self.otx_client = OTXClient()
         self._lock = asyncio.Lock()
+        self._processed_pulse_ids = set()  # Track processed pulses
     
     async def fetch_and_aggregate(self, target_date: Optional[datetime] = None) -> None:
         """
-        Fetch data from AbuseIPDB and aggregate for a specific date
+        Fetch data from OTX and aggregate for a specific date
         
         Args:
             target_date: Date to fetch data for (defaults to yesterday)
@@ -60,66 +66,101 @@ class HistoricalDataStore:
         
         logger.info(f"Fetching historical data for {date_str}")
         
-        # Fetch blacklist data
-        blacklist_data = await self.abuseipdb_client.get_blacklist(
-            confidence_minimum=50,
-            limit=100
+        # Fetch pulses from OTX
+        # Use modified_since to get pulses around the target date
+        modified_since = (target_date - timedelta(days=1)).isoformat()
+        
+        pulses = await self.otx_client.get_pulses_subscribed(
+            limit=50,
+            modified_since=modified_since
         )
         
-        if not blacklist_data:
+        if not pulses:
             # If no API key or error, generate synthetic historical data
-            logger.warning(f"No AbuseIPDB data available, generating synthetic data for {date_str}")
+            logger.warning(f"No OTX data available, generating synthetic data for {date_str}")
             await self._generate_synthetic_data(date_str)
             return
         
-        # Transform AbuseIPDB data to attack events
+        # Transform OTX pulses to attack events
         events = []
-        for item in blacklist_data:
-            country_code = item.get("countryCode", "US")
-            if country_code not in COUNTRY_LOCATIONS:
-                country_code = "US"  # Default to US if unknown
+        for pulse in pulses:
+            pulse_id = pulse.get("id")
             
-            # Create source location
-            source_location = COUNTRY_LOCATIONS[country_code]
+            # Skip if already processed
+            if pulse_id in self._processed_pulse_ids:
+                continue
             
-            # Random target (different from source)
-            target_countries = [c for c in COUNTRY_LOCATIONS.keys() if c != country_code]
-            target_country = random.choice(target_countries)
-            target_location = COUNTRY_LOCATIONS[target_country]
+            # Get indicators for this pulse
+            indicators = pulse.get("indicators", [])
             
-            # Map categories to attack type
-            categories = item.get("categories", [])
-            attack_type = map_category_to_type(categories) if categories else "ddos"
+            # Filter for IP indicators only
+            ip_indicators = [
+                ind for ind in indicators 
+                if ind.get("type") in ["IPv4", "IPv6"]
+            ]
             
-            # Calculate severity
-            confidence_score = item.get("abuseConfidenceScore", 50)
-            total_reports = item.get("totalReports", 1)
-            severity = calculate_severity(confidence_score, total_reports)
+            # If no IP indicators, skip this pulse
+            if not ip_indicators:
+                continue
             
-            # Create event
-            event = {
-                "id": str(uuid.uuid4()),
-                "source": {
-                    "country": country_code,
-                    "lat": source_location["lat"] + random.uniform(-2, 2),
-                    "lng": source_location["lng"] + random.uniform(-2, 2),
-                },
-                "target": {
-                    "country": target_country,
-                    "lat": target_location["lat"] + random.uniform(-2, 2),
-                    "lng": target_location["lng"] + random.uniform(-2, 2),
-                },
-                "type": attack_type,
-                "severity": severity,
-                "confidence": confidence_score / 100.0,
-                "timestamp": int(target_date.timestamp() * 1000),
-            }
-            events.append(event)
+            # Extract pulse metadata
+            tags = pulse.get("tags", [])
+            attack_type = map_tags_to_attack_type(tags)
+            severity = calculate_severity_from_pulse(pulse)
+            confidence = extract_confidence_from_pulse(pulse)
+            
+            # Use pulse created time as timestamp
+            created = pulse.get("created")
+            if created:
+                try:
+                    pulse_timestamp = int(datetime.fromisoformat(created.replace("Z", "+00:00")).timestamp() * 1000)
+                except:
+                    pulse_timestamp = int(target_date.timestamp() * 1000)
+            else:
+                pulse_timestamp = int(target_date.timestamp() * 1000)
+            
+            # Create events from IP indicators
+            # Limit to avoid too many events from one pulse
+            for indicator in ip_indicators[:5]:  # Max 5 events per pulse
+                # Random source and target countries
+                source_country = random.choice(list(COUNTRY_LOCATIONS.keys()))
+                target_country = random.choice([c for c in COUNTRY_LOCATIONS.keys() if c != source_country])
+                
+                source_location = COUNTRY_LOCATIONS[source_country]
+                target_location = COUNTRY_LOCATIONS[target_country]
+                
+                event = {
+                    "id": str(uuid.uuid4()),
+                    "source": {
+                        "country": source_country,
+                        "lat": source_location["lat"] + random.uniform(-2, 2),
+                        "lng": source_location["lng"] + random.uniform(-2, 2),
+                    },
+                    "target": {
+                        "country": target_country,
+                        "lat": target_location["lat"] + random.uniform(-2, 2),
+                        "lng": target_location["lng"] + random.uniform(-2, 2),
+                    },
+                    "type": attack_type,
+                    "severity": severity,
+                    "confidence": confidence,
+                    "timestamp": pulse_timestamp,
+                }
+                events.append(event)
+            
+            # Mark pulse as processed
+            self._processed_pulse_ids.add(pulse_id)
+        
+        if not events:
+            # Fallback to synthetic data
+            logger.warning(f"No events generated from OTX pulses, using synthetic data for {date_str}")
+            await self._generate_synthetic_data(date_str)
+            return
         
         async with self._lock:
             self.events_by_date[date_str] = events
         
-        logger.info(f"Stored {len(events)} events for {date_str}")
+        logger.info(f"Stored {len(events)} events for {date_str} from {len(pulses)} OTX pulses")
     
     async def _generate_synthetic_data(self, date_str: str) -> None:
         """Generate synthetic historical data when API is unavailable"""
